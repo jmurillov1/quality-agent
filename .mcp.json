@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "semgrep": {
+      "command": "semgrep",
+      "args": ["mcp"],
+      "env": {
+        "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN}",
+        "USE_SEMGREP_RPC": "false"
+      }
+    }
+  }
+}
