@@ -8,9 +8,6 @@ build/
 *.iml
 .vscode/
 
-# Reportes generados por el agente (viven dentro del proyecto)
-**/quality-output/report.html
-
 # Secretos / entorno (¡nunca commitear tokens!)
 .env
 *.local
