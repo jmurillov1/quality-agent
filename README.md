@@ -154,5 +154,5 @@ Evidencia en video del ciclo bloqueo → corrección → aprobación:
 [`quality-agent-dod-gate-evidence.mp4`](./quality-agent-dod-gate-evidence.mp4) ·
 también en YouTube: https://youtu.be/edk2huJmQgo
 
-Ver [`ENTREGA.md`](./ENTREGA.md) para el resumen de la entrega y
+Ver [`RESUMEN-ENTREGA.md`](./RESUMEN-ENTREGA.md) para el resumen de la entrega y
 [`REFLEXION.md`](./REFLEXION.md) para la reflexión del ejercicio.

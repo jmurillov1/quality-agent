@@ -52,8 +52,12 @@ cumplir por un bug real de bloqueo optimista/pesimista. El gate
 `verification.json` y decide pasa/bloquea leyendo los tres pilares — nunca el
 modelo por su cuenta.
 
-**Video de la demo (bloqueo → corrección → aprobación):**
-https://youtu.be/edk2huJmQgo
+**Video de la demo (bloqueo → corrección → aprobación):** https://youtu.be/edk2huJmQgo
+
+[![Ver video de la demo del gate](https://img.youtube.com/vi/edk2huJmQgo/maxresdefault.jpg)](https://youtu.be/edk2huJmQgo)
+
+El archivo original también queda en el repo como respaldo:
+[`quality-agent-dod-gate-evidence.mp4`](./quality-agent-dod-gate-evidence.mp4).
 
 ## Verificación de trazabilidad
 
