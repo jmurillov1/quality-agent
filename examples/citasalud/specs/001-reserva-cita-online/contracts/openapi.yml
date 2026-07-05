@@ -1,0 +1,428 @@
+openapi: "3.0.3"
+info:
+  title: CitaSalud API — Reserva de Citas
+  description: >
+    API para la reserva de citas médicas en línea 24/7.
+    Diseñada siguiendo el principio API First; los stubs de servidor se generan
+    automáticamente mediante openapi-generator-maven-plugin.
+  version: "1.0.0"
+  contact:
+    name: Equipo CitaSalud
+    email: dev@citasalud.com
+
+servers:
+  - url: http://localhost:8080
+    description: Servidor local de desarrollo
+  - url: https://api.citasalud.com
+    description: Servidor de producción
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: doctors
+    description: Consulta de médicos y disponibilidad
+  - name: appointments
+    description: Reserva y consulta de citas
+
+paths:
+
+  # ─── Médicos ────────────────────────────────────────────────────────────────
+
+  /v1/doctors:
+    get:
+      operationId: listDoctors
+      tags: [doctors]
+      summary: Listar médicos disponibles
+      description: >
+        Retorna el catálogo de médicos activos. Se puede filtrar por especialidad.
+      parameters:
+        - name: specialty
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+          description: Filtrar por especialidad médica
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Lista de médicos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedDoctors"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/doctors/{doctorId}/time-slots:
+    get:
+      operationId: checkAvailability
+      tags: [doctors]
+      summary: Consultar disponibilidad de un médico
+      description: >
+        Retorna las franjas horarias de un médico para una fecha específica,
+        indicando cuáles están disponibles y cuáles ocupadas.
+      parameters:
+        - name: doctorId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identificador del médico
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Fecha a consultar (formato ISO 8601, ej. 2026-07-15)
+      responses:
+        "200":
+          description: Franjas horarias del médico en la fecha indicada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorAvailability"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─── Citas ───────────────────────────────────────────────────────────────────
+
+  /v1/appointments:
+    post:
+      operationId: bookAppointment
+      tags: [appointments]
+      summary: Reservar una cita
+      description: >
+        Crea una cita confirmada para el paciente en la franja horaria seleccionada.
+        Si la franja ya no está disponible, retorna 409 Conflict.
+        Tras confirmar la cita, el sistema envía una notificación WhatsApp al paciente
+        de forma asíncrona.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookAppointmentRequest"
+      responses:
+        "201":
+          description: Cita confirmada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: La franja horaria ya no está disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "TIME_SLOT_NOT_AVAILABLE"
+                message: "La franja horaria seleccionada ya fue reservada. Por favor elija otra."
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/appointments/{appointmentId}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Obtener detalle de una cita
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Detalle de la cita
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/patients/{patientId}/appointments:
+    get:
+      operationId: listPatientAppointments
+      tags: [appointments]
+      summary: Listar citas de un paciente
+      description: Retorna el historial de citas del paciente ordenado por fecha descendente.
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AppointmentStatus"
+          description: Filtrar por estado de cita
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Lista de citas del paciente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAppointments"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# ─── Componentes ──────────────────────────────────────────────────────────────
+
+components:
+
+  schemas:
+
+    # ── Médicos ──
+
+    DoctorSummary:
+      type: object
+      required: [id, name, specialty, location]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Dr. Carlos Ramírez"
+        specialty:
+          type: string
+          example: "Medicina General"
+        location:
+          $ref: "#/components/schemas/LocationSummary"
+
+    LocationSummary:
+      type: object
+      required: [id, name, address]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Sede Norte"
+        address:
+          type: string
+          example: "Cra 15 # 80-45, Bogotá"
+
+    PagedDoctors:
+      type: object
+      required: [content, currentPage, totalPages, totalElements]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorSummary"
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+
+    DoctorAvailability:
+      type: object
+      required: [doctorId, date, timeSlots]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        timeSlots:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeSlotResponse"
+
+    TimeSlotResponse:
+      type: object
+      required: [id, startTime, endTime, available]
+      properties:
+        id:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: time
+          example: "09:00:00"
+        endTime:
+          type: string
+          format: time
+          example: "09:30:00"
+        available:
+          type: boolean
+          description: >
+            `true` si la franja puede ser reservada; `false` si ya está ocupada.
+
+    # ── Citas ──
+
+    BookAppointmentRequest:
+      type: object
+      required: [patientId, timeSlotId]
+      properties:
+        patientId:
+          type: string
+          format: uuid
+          description: Identificador del paciente que reserva
+        timeSlotId:
+          type: string
+          format: uuid
+          description: Identificador de la franja horaria seleccionada
+
+    AppointmentResponse:
+      type: object
+      required: [id, patientId, doctor, timeSlot, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        doctor:
+          $ref: "#/components/schemas/DoctorSummary"
+        timeSlot:
+          $ref: "#/components/schemas/TimeSlotResponse"
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        createdAt:
+          type: string
+          format: date-time
+
+    AppointmentStatus:
+      type: string
+      enum: [CONFIRMED, CANCELLED]
+
+    PagedAppointments:
+      type: object
+      required: [content, currentPage, totalPages, totalElements]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppointmentResponse"
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+
+    # ── Errores ──
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Código de error interno
+          example: "TIME_SLOT_NOT_AVAILABLE"
+        message:
+          type: string
+          description: Descripción del error legible por el usuario
+          example: "La franja horaria seleccionada ya fue reservada."
+        detail:
+          type: string
+          description: Información adicional de diagnóstico (sólo en entornos no productivos)
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido en el flujo de autenticación del paciente
+
+  responses:
+    BadRequest:
+      description: Solicitud inválida — parámetros faltantes o con formato incorrecto
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "VALIDATION_FAILED"
+            message: "El campo 'timeSlotId' es obligatorio."
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            resource_not_found:
+              value:
+                code: "RESOURCE_NOT_FOUND"
+                message: "No se encontró el recurso con el identificador indicado."
+            patient_not_found:
+              value:
+                code: "PATIENT_NOT_FOUND"
+                message: "No se encontró el paciente con el identificador indicado."
+
+    InternalServerError:
+      description: Error interno del servidor
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "INTERNAL_ERROR"
+            message: "Ocurrió un error inesperado. Por favor intente más tarde."

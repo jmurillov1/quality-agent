@@ -1,0 +1,159 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.12.0'
+    id 'jacoco'
+}
+
+group = 'org.ups.citasalud'
+version = '0.0.1-SNAPSHOT'
+description = 'citasalud'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    archunitVersion    = '1.3.0'
+    testcontainersVersion = '1.20.6'
+    twilioVersion      = '10.1.0'
+    wiremockVersion    = '3.9.2'
+    swaggerVersion     = '2.2.22'
+}
+
+// ─── OpenAPI code generation ──────────────────────────────────────────────────
+
+openApiGenerate {
+    generatorName    = 'spring'
+    inputSpec        = "$rootDir/specs/001-reserva-cita-online/contracts/openapi.yml"
+    outputDir        = "$buildDir/generated/sources/openapi"
+    apiPackage       = 'org.ups.citasalud.generated.api'
+    modelPackage     = 'org.ups.citasalud.generated.model'
+    configOptions    = [
+        interfaceOnly       : 'true',
+        useSpringBoot3      : 'true',
+        useTags             : 'true',
+        openApiNullable     : 'false',
+        skipDefaultInterface: 'true',
+        dateLibrary         : 'java8-localdatetime'
+    ]
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "$buildDir/generated/sources/openapi/src/main/java"
+        }
+    }
+}
+
+compileJava.dependsOn('openApiGenerate')
+
+// ─── Dependencies ─────────────────────────────────────────────────────────────
+
+dependencies {
+    // Spring Boot web + JPA + validation + actuator
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // OpenAPI / Swagger annotations (needed by generated interfaces)
+    implementation "io.swagger.core.v3:swagger-annotations:${swaggerVersion}"
+    implementation "io.swagger.core.v3:swagger-models:${swaggerVersion}"
+
+    // Database
+    runtimeOnly 'com.h2database:h2'
+    implementation 'org.flywaydb:flyway-core'
+
+    // Twilio WhatsApp SDK
+    implementation "com.twilio.sdk:twilio:${twilioVersion}"
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation "com.tngtech.archunit:archunit-junit5:${archunitVersion}"
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+    testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+    testImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
+    // H2 ya declarado en runtimeOnly arriba
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ─── JaCoCo ──────────────────────────────────────────────────────────────────
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+tasks.withType(Test).configureEach {
+    jacoco {
+        includes = ['org.ups.citasalud.*']
+    }
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/generated/**',
+                '**/CitasaludApplication*'
+            ])
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value   = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+        rule {
+            element = 'CLASS'
+            excludes = ['org.ups.citasalud.generated.*', '*CitasaludApplication*']
+            limit {
+                counter = 'INSTRUCTION'
+                value   = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: ['**/generated/**', '**/CitasaludApplication*'])
+        }))
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+check.dependsOn jacocoTestCoverageVerification

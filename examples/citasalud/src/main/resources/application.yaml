@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: citasalud
+
+  datasource:
+    url: jdbc:h2:mem:citasalud;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  h2:
+    console:
+      enabled: false
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:ACtest000000000000000000000000000000}
+  auth-token: ${TWILIO_AUTH_TOKEN:test_auth_token}
+  whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+14155238886}
