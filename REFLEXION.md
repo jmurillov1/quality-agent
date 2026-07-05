@@ -6,54 +6,55 @@ seguridad y criterios de aceptación.
 
 ## ¿Qué cambió en tu forma de "dar por terminado" el código cuando el veredicto lo decidió un gate determinista en vez de tu propio criterio?
 
-Al auditar `citasalud` la primera vez, mi lectura del código me hubiera dejado
-tranquilo con un vistazo superficial: 60 de 63 pruebas pasaban, la cobertura
-reportada rondaba el 98%, y el caso de uso de reserva "se veía" razonable. El
-gate no permite ese tipo de conformidad parcial — no hay un punto intermedio
-entre `APROBADO` y `BLOQUEADO`. Al ejecutar `./gradlew test jacocoTestReport`
-de verdad (no asumir que "ya deben pasar"), aparecieron 3 fallos concretos, y
-el cruce contra el `spec.md` señaló que **RF-006** (concurrencia: solo una
-reserva debe prosperar sobre la misma franja) no tenía respaldo real. El gate
-me obligó a rastrear la causa raíz exacta —`BookAppointmentUseCaseImpl.java:37`
-llamaba a `findById` en vez de `findByIdForUpdate`, ignorando el lock
-pesimista que el propio adaptador ya exponía— en vez de conformarme con "la
-mayoría de las pruebas pasan". "Terminado" dejó de ser una impresión y pasó a
-ser una condición verificable: o las 63 pruebas pasan y cada FR tiene una
-prueba que lo demuestra, o no está terminado, sin importar cuán razonable
-parezca el código a simple vista.
+La primera vez que auditué `citasalud`, hubiera defendido a capa y espada el
+resultado inicial: 60 de 63 pruebas pasaban, la cobertura pasaba el 98%, y el
+caso de uso de reserva "se veía" razonable. El gate no se conforma con eso, no
+admite ningún tipo de conformidad parcial — no hay medias tintas, como se
+dice, entre `APROBADO` y `BLOQUEADO`. Al correr `./gradlew test
+jacocoTestReport` de verdad (nunca asumir que "ya deben pasar"), surgieron 3
+fallos específicos, y el cruce contra el `spec.md` determinó que **RF-006**
+(concurrencia: solo una reserva debe prosperar sobre la misma franja) no
+tenía respaldo real. El gate me obligó a rastrear la causa raíz exacta
+—`BookAppointmentUseCaseImpl.java:37` llamaba a `findById` en vez de
+`findByIdForUpdate`, ignorando el lock pesimista que el propio adaptador ya
+exponía— en vez de conformarme con "la mayoría de las pruebas pasan".
+"Terminado" dejó de ser una impresión y pasó a ser una condición verificable:
+o las 63 pruebas pasan y cada FR tiene asignada una prueba que lo demuestre,
+o no llega a estar terminado, sin importar qué tan bien se vea el código a
+simple vista.
 
 ## ¿Qué pilar te costó más dejar en verde —pruebas, seguridad o criterios—, y por qué?
 
-El pilar de **criterios** fue el más difícil, precisamente porque es el único
-que no se resuelve corriendo un comando: exige leer el `spec.md` línea por
-línea y decidir, para cada `RF-xxx`, si existe una prueba que lo ejercite de
-verdad y no solo un test con un nombre parecido. La condición de carrera de
-RF-006 es el ejemplo claro: `ConcurrentBookingFunctionalTest` ya existía y
-tenía un nombre que sugería cobertura de concurrencia, pero antes de la
-corrección **fallaba** (esperaba `conflict == 1` y obtenía `0`), lo cual
-demuestra por qué la regla es "sin prueba que lo demuestre, nunca `cumple`" y
-no "si existe un test con ese nombre, `cumple`". Pruebas y seguridad, en
-cambio, se resolvieron con evidencia mecánica (JaCoCo, Semgrep) que no admite
-interpretación; criterios exige el juicio de leer la prueba y el requisito, y
-ahí es donde es más fácil, bajo presión, dar por cumplido algo que solo "se
-parece" a estar cubierto.
+El pilar de **criterios** fue el más complicado, porque este no se resuelve
+con un comando: exige leer el `spec.md` línea a línea y decidir, para cada
+`RF-xxx`, si hay una prueba que lo respalde de verdad y no solo un test con un
+nombre similar. La condición de carrera de RF-006 es el ejemplo claro:
+`ConcurrentBookingFunctionalTest` ya existía y tenía un nombre que daba por
+hecho la cobertura de concurrencia, pero antes de la corrección **fallaba**
+(esperaba `conflict == 1` y obtenía `0`), lo cual demuestra por qué la regla
+es "sin una prueba que lo demuestre, nunca `cumple`" y no "si existe un test
+con ese nombre, `cumple`". Los pilares de Pruebas y Seguridad, en cambio, se
+resolvieron con evidencia directa (JaCoCo, Semgrep) que no admite nada a la
+interpretación; los criterios exigen el juicio de leer la prueba y el
+requisito, y ahí es donde es más fácil, bajo presión, dar por hecho algo que
+solo "se parece" a estar cubierto.
 
 ## ¿Para qué te serviría un gate de Definition of Done (y el escaneo automático de seguridad vía MCP) en tu equipo real?
 
-En un equipo real, la presión de fecha de entrega es exactamente el momento en
-que "sabemos que falta ese test pero lo agregamos después" se vuelve la norma,
-y ese "después" casi nunca llega. Un gate que bloquea el merge —no que lo
-recomienda— si la cobertura cae del umbral, si Semgrep encuentra una crítica,
-o si un requisito del spec no tiene prueba, saca esa decisión de la
-negociación humana del momento y la convierte en una condición objetiva
-verificada antes de integrar. El escaneo de seguridad vía MCP (Semgrep) es
-igual de valioso porque no depende de que alguien se acuerde de correrlo
-manualmente antes de cada release: corre como parte del mismo flujo que ya se
-ejecuta para verificar pruebas y criterios, con la misma autoridad. La lección
-concreta de este ejercicio —que "la mayoría de las pruebas pasan" no es lo
-mismo que "el requisito de concurrencia está cubierto"— es exactamente el tipo
-de brecha silenciosa que un gate determinista, y no la buena voluntad del
-equipo, está diseñado para atrapar.
+En mi equipo, la presión de entregar algo es precisamente el momento en que
+"sabemos que falta una prueba pero lo dejamos para luego" se vuelve lo
+normal, y ese "luego" casi nunca llega. Un gate que bloquea el merge —no que
+lo recomienda— si la cobertura cae del umbral, si Semgrep encuentra una
+crítica, o si un requisito del spec no tiene prueba, quita la decisión del
+factor humano del momento y la convierte en un requisito verificado antes de
+integrar. El escaneo de seguridad vía MCP (Semgrep) es igual de poderoso
+porque no depende del factor humano: se ejecuta automáticamente como parte
+del mismo flujo de trabajo que ya se hace para pasar pruebas y criterios, con
+la misma autoridad. Lo más valioso que deja constancia este ejercicio —que
+"la mayoría de las pruebas pasan" no es igual que "el requisito de
+concurrencia está cubierto"— es exactamente el tipo de falla silenciosa que
+un gate determinista, y no la buena voluntad del equipo, está diseñado para
+atrapar.
 
 ## Cierre
 
